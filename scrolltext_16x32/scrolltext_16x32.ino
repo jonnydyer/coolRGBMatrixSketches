@@ -37,7 +37,7 @@ RGBmatrixPanel matrix(A, B, C, CLK, LAT, OE, true);
 // Similar to F(), but for PROGMEM string pointers rather than literals
 #define F2(progmem_ptr) (const __FlashStringHelper *)progmem_ptr
 
-const char str[] PROGMEM = "It's 5 o'clock Somewhere";
+const char str[] PROGMEM = "Crushin' It From Home";
 int16_t    textX         = matrix.width(),
            textMin       = sizeof(str) * -12,
            hue           = 0;
@@ -90,7 +90,7 @@ void loop() {
 
 #if !defined(__AVR__)
   // On non-AVR boards, delay slightly so screen updates aren't too quick.
-  delay(30);
+  delay(20);
 #endif
 
   // Update display

@@ -10,10 +10,10 @@
 #define C   A2
 
 #define FPS 100         // Maximum frames-per-second
-#define N_PARTICLES 10
+#define N_PARTICLES 5
 #define ORIGIN_X 16
 #define ORIGIN_Y 8
-#define G 100.0f
+#define G 30.0f
 uint32_t prevTime = 0; // For frame-to-frame interval timing
 
 long hue[32][16];
@@ -52,9 +52,9 @@ void seed_particle(particle_t &p){
     p.y = random(0, 1.4e6)/1e5 - 7.0f;
     p.z = random(0, 1e6)/1e5 - 5.0f;
 
-    p.ux = random(0, 1e6)/1e4 - 50.0f;
-    p.uy = random(0, 1e6)/1e4 - 50.0f;
-    p.uz = random(0, 1e6)/1e4 - 50.0f;
+    p.ux = 0;//random(0, 2e6)/1e5 - 10.0f;
+    p.uy = 0;//random(0, 2e6)/1e5 - 10.0f;
+    p.uz = 0;//random(0, 2e6)/1e5 - 10.0f;
 
     p.ax = 0.0f;
     p.ay = 0.0f;
@@ -105,9 +105,9 @@ void update(float dt) {
       //rmag = sqrt(r2);
       
       // G * m1 * m2 * rx / |r| / r^2
-      p->ax += G * m2 * rx / (r2 + 1);
-      p->ay += G * m2 * ry / (r2 + 1);
-      p->az += G * m2 * rz / (r2 + 1);
+      p->ax += G * m2 * rx / (r2 + 0);
+      p->ay += G * m2 * ry / (r2 + 0);
+      p->az += G * m2 * rz / (r2 + 0);
     }
     p->ax *= m1_i;
     p->ay *= m1_i;
@@ -149,7 +149,7 @@ void update(float dt) {
 }
 
 void loop() {
-  update(0.001);
+  update(0.003);
   
   uint32_t t;
   while(((t = millis()) - prevTime) < (1000 / FPS));
