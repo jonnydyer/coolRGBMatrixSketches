@@ -10,10 +10,15 @@
 #define C   A2
 
 #define FPS 100         // Maximum frames-per-second
-#define N_PARTICLES 5
+#define N_PARTICLES 15
 #define ORIGIN_X 16
 #define ORIGIN_Y 8
-#define G 30.0f
+#define G 100.0f
+#define Mc 500.0f
+#define DIST_MIN 0.2f
+#define U_C 8.0f
+#define DT 0.01f
+
 uint32_t prevTime = 0; // For frame-to-frame interval timing
 
 long hue[32][16];
@@ -21,7 +26,10 @@ float value[32][16];
 
 RGBmatrixPanel matrix(A, B, C, CLK, LAT, OE, true);
 typedef struct particle {
-  float x,y,z,ux, uy, uz, ax, ay, az;
+  float x, y, z;
+  float ux, uy, uz;
+  float ax, ay, az;
+  float u1_2x, u1_2y, u1_2z;
   float m;
 }particle_t;
 
@@ -29,57 +37,55 @@ particle_t g_particles[N_PARTICLES];
 
 void update(float dt);
 void seed_particle(particle_t &p);
+void calc_ai(particle_t *ps);
 bool on_screen(int i, int j);
 
 void setup() {
-  for(int i=0; i<32; i++){
-    for(int j=0; j<16; j++){
+  particle_t *p;
+  float px, py;
+  int i, j;
+
+  for(i=0; i<32; i++){
+    for(j=0; j<16; j++){
       value[i][j] = 0.0f;
       hue[i][j] = 0;
     }
   }
 
-  for(int i=0; i<N_PARTICLES; i++){
+  for(i=0; i<N_PARTICLES; i++){
     seed_particle(g_particles[i]);
   }
   
+  //Make sure total momentum is zero
+  px = 0.0f;
+  py = 0.0f;
+  for(i=0; i<N_PARTICLES-1; i++){
+    px += g_particles[i].ux * g_particles[i].m;
+    py += g_particles[i].uy * g_particles[i].m;
+  }
+  g_particles[N_PARTICLES].ux = -px / g_particles[N_PARTICLES].m;
+  g_particles[N_PARTICLES].uy = -py / g_particles[N_PARTICLES].m;
+
+  calc_ai(g_particles);
+
+  for(i=0; i<N_PARTICLES; i++){
+    p = &g_particles[i];
+    p->u1_2x = p->ux + p->ax * DT;
+    p->u1_2y = p->uy + p->ay * DT;
+    p->u1_2z = p->uz + p->az * DT;
+  }
+
   // put your setup code here, to run once:
   matrix.begin();
 }
 
-void seed_particle(particle_t &p){
-    p.x = random(0, 3e6)/1e5 - 15.0f;
-    p.y = random(0, 1.4e6)/1e5 - 7.0f;
-    p.z = random(0, 1e6)/1e5 - 5.0f;
-
-    p.ux = 0;//random(0, 2e6)/1e5 - 10.0f;
-    p.uy = 0;//random(0, 2e6)/1e5 - 10.0f;
-    p.uz = 0;//random(0, 2e6)/1e5 - 10.0f;
-
-    p.ax = 0.0f;
-    p.ay = 0.0f;
-    p.az = 0.0f;
-
-    p.m = random(1, 1e4)/10;
-}
-
-bool on_screen(int i, int j)
-{
-  if((i < 0) || (i > 31)){
-    return false;
-  }else if((j < 0) || (j > 15)){
-    return false;
-  }
-  return true;
-}
-
-void update(float dt) {
+void calc_ai(particle_t *ps) {
   int i, j, k;
-  float x, y, z, r2, rx, ry, rz, m1_i, m2, rmag;
   particle_t *p;
+  float x, y, z, r2, rx, ry, rz, m1_i, m2, rmag;
   
   for(i=0; i<N_PARTICLES;i++){
-    p = &g_particles[i];
+    p = &ps[i];
     p->ax = 0.0f;
     p->ay = 0.0f;
     p->az = 0.0f;
@@ -97,28 +103,65 @@ void update(float dt) {
       if(i == j){
         continue;
       }
-      rx = (g_particles[j].x - x);
-      ry = (g_particles[j].y - y);
-      rz = (g_particles[j].z - z);
-      m2 = g_particles[j].m;
-      r2 = rx * rx + ry * ry + rz * rz;
-      //rmag = sqrt(r2);
+      rx = (ps[j].x - x);
+      ry = (ps[j].y - y);
+      rz = (ps[j].z - z);
+      m2 = ps[j].m;
+      r2 = rx * rx + ry * ry + rz * rz + DIST_MIN*DIST_MIN;
       
       // G * m1 * m2 * rx / |r| / r^2
-      p->ax += G * m2 * rx / (r2 + 0);
-      p->ay += G * m2 * ry / (r2 + 0);
-      p->az += G * m2 * rz / (r2 + 0);
+      p->ax += G * m2 * rx / r2;
+      p->ay += G * m2 * ry / r2;
+      p->az += G * m2 * rz / r2;
     }
+    r2 = x * x + y * y + z * z + DIST_MIN * DIST_MIN;
+    p->ax += -G * Mc * x / r2;
+    p->ay += -G * Mc * y / r2;
+    p->az += -G * Mc * z / r2;
     p->ax *= m1_i;
     p->ay *= m1_i;
     p->az *= m1_i;
-    p->ux += p->ax * dt;
-    p->uy += p->ay * dt;
-    p->uz += p->az * dt;
+  }
+}
+void seed_particle(particle_t &p){
+    p.x = random(0, 1e6)/1e5 - 5.0f;
+    p.y = random(0, 1e6)/1e5 - 5.0f;
+    p.z = random(0, 1e6)/1e5 - 5.0f;
 
-    p->x += p->ux * dt;
-    p->y += p->uy * dt;
-    p->z += p->uz * dt;
+    p.ux = -U_C * p.y;
+    p.uy = U_C * p.x;
+    p.uz = 0;
+    
+    p.ax = 0.0f;
+    p.ay = 0.0f;
+    p.az = 0.0f;
+
+    p.m = random(1, 1e4)/100;
+}
+
+bool on_screen(int i, int j)
+{
+  if((i < 0) || (i > 31)){
+    return false;
+  }else if((j < 0) || (j > 15)){
+    return false;
+  }
+  return true;
+}
+
+void update(float dt) {
+  int i, j, k;
+
+  calc_ai(g_particles);
+
+  for(i=0; i<N_PARTICLES; i++){
+    p->u1_2x += p->ax * dt;
+    p->u1_2y += p->ay * dt;
+    p->u1_2z += p->az * dt;
+
+    p->x += p->u1_2x * dt;
+    p->y += p->u1_2y * dt;
+    p->z += p->u1_2y * dt;
   }
 
   for(i=0; i<32; i++){
@@ -149,7 +192,7 @@ void update(float dt) {
 }
 
 void loop() {
-  update(0.003);
+  update(DT);
   
   uint32_t t;
   while(((t = millis()) - prevTime) < (1000 / FPS));
